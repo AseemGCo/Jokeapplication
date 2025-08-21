@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Joke Generator - Futuristic Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b, #4ecdc4);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease-in-out infinite;
+            margin-bottom: 10px;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .current-joke {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .current-joke::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d4ff, #ff6b6b, #4ecdc4);
+            animation: loading 2s ease-in-out infinite;
+        }
+
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .joke-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .joke-title::before {
+            content: '🤖';
+            font-size: 1.8rem;
+        }
+
+        .joke-text {
+            font-size: 1.3rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #f0f0f0;
+        }
+
+        .joke-timestamp {
+            font-size: 0.9rem;
+            color: #888;
+            text-align: right;
+        }
+
+        .joke-history {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .history-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #4ecdc4;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-title::before {
+            content: '📚';
+            font-size: 1.8rem;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid #00d4ff;
+            transition: all 0.3s ease;
+        }
+
+        .history-item:hover {
+            transform: translateX(5px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .history-joke {
+            font-size: 1rem;
+            margin-bottom: 10px;
+            color: #f0f0f0;
+        }
+
+        .history-timestamp {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(78, 205, 196, 0.4);
+        }
+        
+        .refresh-rate-controls {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .refresh-rate-input {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .refresh-rate-input label {
+            font-weight: 600;
+            color: #00d4ff;
+            white-space: nowrap;
+        }
+        
+        .refresh-rate-input input {
+            padding: 10px 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            font-size: 1rem;
+            width: 120px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .refresh-rate-input input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+        }
+        
+        .refresh-rate-input input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .refresh-rate-info {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-rate-info span {
+            color: #4ecdc4;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(78, 205, 196, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(78, 205, 196, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(78, 205, 196, 0); }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #00d4ff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, #00d4ff, #4ecdc4);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(45deg, #0099cc, #44a08d);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .stats-bar {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .refresh-rate-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .refresh-rate-input {
+                justify-content: center;
+            }
+            
+            .refresh-rate-info {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Joke Generator</h1>
+            <p class="subtitle">Powered by Advanced Humor Algorithms</p>
+            <div class="status-indicator"></div>
+            <span>Live Connection Active</span>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-number" id="totalJokes">0</div>
+                <div class="stat-label">Total Jokes</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="refreshRate">2s</div>
+                <div class="stat-label">Refresh Rate</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="uptime">00:00</div>
+                <div class="stat-label">Uptime</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" onclick="refreshJoke()">
+                <span class="loading" id="refreshLoading" style="display: none;"></span>
+                Refresh Now
+            </button>
+            <button class="btn btn-secondary" onclick="clearHistory()">Clear History</button>
+            <button class="btn btn-success" onclick="toggleAutoRefresh()" id="autoRefreshBtn">Auto Refresh: ON</button>
+        </div>
+        
+        <div class="refresh-rate-controls">
+            <div class="refresh-rate-input">
+                <label for="refreshRateInput">Refresh Rate (seconds):</label>
+                <input type="number" id="refreshRateInput" min="1" max="300" step="0.5" value="2" placeholder="Enter refresh rate">
+                <button class="btn btn-primary" onclick="updateRefreshRate()">Update Rate</button>
+            </div>
+            <div class="refresh-rate-info">
+                <span>Current: <span id="currentRefreshRate">2s</span></span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="current-joke">
+                <div class="joke-title">Current Joke</div>
+                <div class="joke-text" id="currentJoke">
+                    <div class="loading"></div>
+                    <span style="margin-left: 10px;">Fetching your first joke...</span>
+                </div>
+                <div class="joke-timestamp" id="currentTimestamp"></div>
+            </div>
+
+            <div class="joke-history">
+                <div class="history-title">Joke History</div>
+                <div id="jokeHistory">
+                    <div style="text-align: center; color: #888; padding: 20px;">
+                        No jokes in history yet...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Built with Spring Boot & WebSocket Technology</p>
+            <p>Powered by icanhazdadjoke.com API</p>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let autoRefreshEnabled = true;
+        let startTime = Date.now();
+
+        // Initialize WebSocket connection
+        function connect() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function (frame) {
+                console.log('Connected: ' + frame);
+                stompClient.subscribe('/topic/jokes', function (joke) {
+                    const jokeData = JSON.parse(joke.body);
+                    updateCurrentJoke(jokeData);
+                    addToHistory(jokeData);
+                    updateStats();
+                });
+            });
+        }
+
+        // Update current joke display
+        function updateCurrentJoke(joke) {
+            document.getElementById('currentJoke').innerHTML = `
+                <div style="text-align: center;">
+                    <div style="font-size: 1.3rem; line-height: 1.6; color: #f0f0f0;">
+                        ${joke.joke}
+                    </div>
+                </div>
+            `;
+            
+            const timestamp = new Date(joke.timestamp).toLocaleTimeString();
+            document.getElementById('currentTimestamp').textContent = `Last updated: ${timestamp}`;
+        }
+
+        // Add joke to history
+        function addToHistory(joke) {
+            const historyContainer = document.getElementById('jokeHistory');
+            const timestamp = new Date(joke.timestamp).toLocaleTimeString();
+            
+            const historyItem = document.createElement('div');
+            historyItem.className = 'history-item';
+            historyItem.innerHTML = `
+                <div class="history-joke">${joke.joke}</div>
+                <div class="history-timestamp">${timestamp}</div>
+            `;
+            
+            // Add to beginning of history
+            if (historyContainer.children.length === 1 && historyContainer.children[0].textContent.includes('No jokes')) {
+                historyContainer.innerHTML = '';
+            }
+            historyContainer.insertBefore(historyItem, historyContainer.firstChild);
+            
+            // Limit history to 20 items
+            while (historyContainer.children.length > 20) {
+                historyContainer.removeChild(historyContainer.lastChild);
+            }
+        }
+
+        // Update statistics
+        function updateStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('totalJokes').textContent = data.totalJokes;
+                    
+                    // Update refresh rate display
+                    if (data.refreshRate !== undefined) {
+                        const refreshRateSeconds = data.refreshRate / 1000;
+                        document.getElementById('refreshRate').textContent = refreshRateSeconds + 's';
+                        document.getElementById('currentRefreshRate').textContent = refreshRateSeconds + 's';
+                        document.getElementById('refreshRateInput').value = refreshRateSeconds;
+                    }
+                    
+                    // Update auto-refresh status if it changed
+                    if (data.autoRefreshEnabled !== undefined && data.autoRefreshEnabled !== autoRefreshEnabled) {
+                        autoRefreshEnabled = data.autoRefreshEnabled;
+                        const btn = document.getElementById('autoRefreshBtn');
+                        btn.textContent = `Auto Refresh: ${autoRefreshEnabled ? 'ON' : 'OFF'}`;
+                        btn.style.background = autoRefreshEnabled ? 
+                            'linear-gradient(45deg, #4ecdc4, #44a08d)' : 
+                            'linear-gradient(45deg, #ff6b6b, #ee5a52)';
+                    }
+                })
+                .catch(error => console.error('Error fetching stats:', error));
+        }
+
+        // Refresh joke manually
+        function refreshJoke() {
+            const loading = document.getElementById('refreshLoading');
+            loading.style.display = 'inline-block';
+            
+            fetch('/api/jokes/refresh', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    setTimeout(() => {
+                        loading.style.display = 'none';
+                    }, 1000);
+                })
+                .catch(error => {
+                    console.error('Error refreshing joke:', error);
+                    loading.style.display = 'none';
+                });
+        }
+
+        // Clear joke history
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all joke history?')) {
+                fetch('/api/jokes', { method: 'DELETE' })
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('jokeHistory').innerHTML = `
+                            <div style="text-align: center; color: #888; padding: 20px;">
+                                No jokes in history yet...
+                            </div>
+                        `;
+                        updateStats();
+                    })
+                    .catch(error => console.error('Error clearing history:', error));
+            }
+        }
+
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            fetch('/api/autorefresh/toggle', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    autoRefreshEnabled = data.enabled;
+                    const btn = document.getElementById('autoRefreshBtn');
+                    btn.textContent = `Auto Refresh: ${autoRefreshEnabled ? 'ON' : 'OFF'}`;
+                    btn.style.background = autoRefreshEnabled ? 
+                        'linear-gradient(45deg, #4ecdc4, #44a08d)' : 
+                        'linear-gradient(45deg, #ff6b6b, #ee5a52)';
+                    
+                    // Show notification
+                    showNotification(data.message);
+                })
+                .catch(error => {
+                    console.error('Error toggling auto-refresh:', error);
+                    showNotification('Error toggling auto-refresh');
+                });
+        }
+        
+        // Update refresh rate
+        function updateRefreshRate() {
+            const input = document.getElementById('refreshRateInput');
+            const newRate = parseFloat(input.value);
+            
+            if (isNaN(newRate) || newRate < 1 || newRate > 300) {
+                showNotification('Please enter a valid refresh rate between 1 and 300 seconds');
+                return;
+            }
+            
+            fetch('/api/refresh-rate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ refreshRate: newRate })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message);
+                    updateStats(); // Refresh the display
+                } else {
+                    showNotification('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating refresh rate:', error);
+                showNotification('Error updating refresh rate');
+            });
+        }
+        
+        // Show notification
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 212, 255, 0.9);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 10px;
+                z-index: 1000;
+                font-weight: 600;
+                box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+                animation: slideIn 0.3s ease-out;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 2000);
+        }
+
+        // Update uptime
+        function updateUptime() {
+            const uptime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(uptime / 60);
+            const seconds = uptime % 60;
+            document.getElementById('uptime').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            connect();
+            updateStats();
+            setInterval(updateUptime, 1000);
+            
+            // Add Enter key listener for refresh rate input
+            document.getElementById('refreshRateInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    updateRefreshRate();
+                }
+            });
+            
+            // Sync auto-refresh state with server
+            fetch('/api/autorefresh/status')
+                .then(response => response.json())
+                .then(data => {
+                    autoRefreshEnabled = data.enabled;
+                    const btn = document.getElementById('autoRefreshBtn');
+                    btn.textContent = `Auto Refresh: ${autoRefreshEnabled ? 'ON' : 'OFF'}`;
+                    btn.style.background = autoRefreshEnabled ? 
+                        'linear-gradient(45deg, #4ecdc4, #44a08d)' : 
+                        'linear-gradient(45deg, #ff6b6b, #ee5a52)';
+                })
+                .catch(error => console.error('Error fetching auto-refresh status:', error));
+            
+            // Load initial joke history
+            fetch('/api/jokes')
+                .then(response => response.json())
+                .then(jokes => {
+                    const historyContainer = document.getElementById('jokeHistory');
+                    if (jokes.length === 0) {
+                        historyContainer.innerHTML = `
+                            <div style="text-align: center; color: #888; padding: 20px;">
+                                No jokes in history yet...
+                            </div>
+                        `;
+                    } else {
+                        historyContainer.innerHTML = '';
+                        jokes.reverse().forEach(joke => addToHistory(joke));
+                    }
+                })
+                .catch(error => console.error('Error loading joke history:', error));
+        });
+    </script>
+</body>
+</html>

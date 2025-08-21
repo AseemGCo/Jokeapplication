@@ -1,0 +1,7 @@
+com\jokeapp\config\RestTemplateConfig.class
+com\jokeapp\config\SchedulingConfig.class
+com\jokeapp\model\Joke.class
+com\jokeapp\config\WebSocketConfig.class
+com\jokeapp\controller\JokeController.class
+com\jokeapp\service\JokeService.class
+com\jokeapp\JokeGeneratorApplication.class
